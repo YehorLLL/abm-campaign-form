@@ -293,7 +293,7 @@
 
       // Get webhook URL and execution ID from URL parameters
       const urlParams = new URLSearchParams(window.location.search);
-      const webhookUrl = urlParams.get('webhook') || 'YOUR_N8N_WEBHOOK_URL_HERE';
+      const webhookUrl = 'https://abm-form-cors-proxy.ops-ffa.workers.dev';
       const executionId = urlParams.get('execution_id');
 
       useEffect(() => {
