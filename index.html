@@ -291,8 +291,10 @@
       const [submitting, setSubmitting] = useState(false);
       const [submitted, setSubmitted] = useState(false);
 
-      // Get webhook URL from URL parameters
-      const webhookUrl = new URLSearchParams(window.location.search).get('webhook') || 'YOUR_N8N_WEBHOOK_URL_HERE';
+      // Get webhook URL and execution ID from URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const webhookUrl = urlParams.get('webhook') || 'YOUR_N8N_WEBHOOK_URL_HERE';
+      const executionId = urlParams.get('execution_id');
 
       useEffect(() => {
         const messages = { linkedin: {}, email: {} };
@@ -376,6 +378,7 @@
         const payload = {
           ...formData,
           messages: filteredMessages,
+          execution_id: executionId,
           submitted_at: new Date().toISOString()
         };
 
@@ -385,18 +388,22 @@
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            mode: 'cors',
+            credentials: 'omit'
           });
 
           if (response.ok) {
             setSubmitted(true);
             console.log('Form submitted successfully!', payload);
           } else {
-            alert('Error submitting form. Please try again.');
+            const errorText = await response.text();
+            console.error('Server error:', response.status, errorText);
+            alert(`Error submitting form: ${response.status} ${response.statusText}`);
           }
         } catch (error) {
           console.error('Error:', error);
-          alert('Error submitting form. Please check console for details.');
+          alert(`Error submitting form: ${error.message}. Please check console for details.`);
         } finally {
           setSubmitting(false);
         }
