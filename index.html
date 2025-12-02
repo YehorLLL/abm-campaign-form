@@ -248,25 +248,16 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    const LINKEDIN_TYPES = {
-      'connection_request': 'Connection Request',
-      'post_accept_followup': 'Post-Accept Followup',
-      'light_pitch': 'Light Pitch',
+    // NEW: Unified message types (no LinkedIn/Email split)
+    const MESSAGE_TYPES = {
       'book_meeting_online': 'Book Meeting Online',
       'book_meeting_offline': 'Book Meeting Offline',
       'book_demo_online': 'Book Demo Online',
-      'bump_message': 'Bump Message',
-      'inmail_introduce_us': 'InMail Introduce Us',
-      'inmail_book_meeting_online': 'InMail Book Meeting Online',
-      'inmail_book_meeting_offline': 'InMail Book Meeting Offline',
-      'inmail_book_demo_online': 'InMail Book Demo Online'
-    };
-
-    const EMAIL_TYPES = {
       'introduce_us': 'Introduce Us',
-      'book_meeting_online': 'Book Meeting Online',
-      'book_meeting_offline': 'Book Meeting Offline',
-      'book_demo_online': 'Book Demo Online'
+      'light_pitch': 'Light Pitch',
+      'post_accept_followup': 'Post-Accept Followup',
+      'connection_request': 'Connection Request',
+      'bump_message': 'Bump Message'
     };
 
     const SEGMENTS = {
@@ -279,12 +270,11 @@
     };
 
     function ABMCampaignForm() {
+      // NEW: Simplified state (no message_channels, linkedin_types, email_types)
       const [formData, setFormData] = useState({
-        message_channels: [],
+        message_types: [],      // NEW: unified message types
         target_segments: [],
         ab_testing: 'disabled',
-        linkedin_types: [],
-        email_types: [],
         messages: {}
       });
 
@@ -296,20 +286,14 @@
       const webhookUrl = 'https://abm-form-cors-proxy.ops-ffa.workers.dev';
       const executionId = urlParams.get('execution_id');
 
+      // NEW: Initialize messages with message_type structure (not linkedin/email)
       useEffect(() => {
-        const messages = { linkedin: {}, email: {} };
+        const messages = {};
         
-        Object.keys(LINKEDIN_TYPES).forEach(type => {
-          messages.linkedin[type] = {};
+        Object.keys(MESSAGE_TYPES).forEach(type => {
+          messages[type] = {};
           Object.keys(SEGMENTS).forEach(segment => {
-            messages.linkedin[type][segment] = { A: '', B: '' };
-          });
-        });
-
-        Object.keys(EMAIL_TYPES).forEach(type => {
-          messages.email[type] = {};
-          Object.keys(SEGMENTS).forEach(segment => {
-            messages.email[type][segment] = { A: '', B: '' };
+            messages[type][segment] = { A: '', B: '' };
           });
         });
 
@@ -325,30 +309,27 @@
         }));
       };
 
-      const handleMessageChange = (channel, type, segment, variant, value) => {
+      // NEW: Simplified handleMessageChange (no channel parameter)
+      const handleMessageChange = (type, segment, variant, value) => {
         setFormData(prev => ({
           ...prev,
           messages: {
             ...prev.messages,
-            [channel]: {
-              ...prev.messages[channel],
-              [type]: {
-                ...prev.messages[channel][type],
-                [segment]: {
-                  ...prev.messages[channel][type][segment],
-                  [variant]: value
-                }
+            [type]: {
+              ...prev.messages[type],
+              [segment]: {
+                ...prev.messages[type][segment],
+                [variant]: value
               }
             }
           }
         }));
       };
 
-      const shouldShowField = (channel, type, segment, variant) => {
-        if (!formData.message_channels.includes(channel)) return false;
+      // NEW: Simplified shouldShowField (no channel parameter)
+      const shouldShowField = (type, segment, variant) => {
+        if (!formData.message_types.includes(type)) return false;
         if (!formData.target_segments.includes(segment)) return false;
-        const typeField = channel === 'linkedin' ? 'linkedin_types' : 'email_types';
-        if (!formData[typeField].includes(type)) return false;
         if (variant === 'B' && formData.ab_testing !== 'enabled') return false;
         return true;
       };
@@ -357,27 +338,28 @@
         e.preventDefault();
         setSubmitting(true);
 
+        // Filter messages (remove empty)
         const filteredMessages = {};
-        ['linkedin', 'email'].forEach(channel => {
-          filteredMessages[channel] = {};
-          Object.keys(formData.messages[channel]).forEach(type => {
-            filteredMessages[channel][type] = {};
-            Object.keys(formData.messages[channel][type]).forEach(segment => {
-              const hasA = formData.messages[channel][type][segment].A.trim() !== '';
-              const hasB = formData.messages[channel][type][segment].B.trim() !== '';
-              if (hasA || hasB) {
-                filteredMessages[channel][type][segment] = {
-                  A: formData.messages[channel][type][segment].A,
-                  B: formData.messages[channel][type][segment].B
-                };
-              }
-            });
+        Object.keys(formData.messages).forEach(type => {
+          filteredMessages[type] = {};
+          Object.keys(formData.messages[type]).forEach(segment => {
+            const hasA = formData.messages[type][segment].A.trim() !== '';
+            const hasB = formData.messages[type][segment].B.trim() !== '';
+            if (hasA || hasB) {
+              filteredMessages[type][segment] = {
+                A: formData.messages[type][segment].A,
+                B: formData.messages[type][segment].B
+              };
+            }
           });
         });
 
+        // NEW: Payload structure (message_types instead of message_channels)
         const payload = {
-          ...formData,
-          messages: filteredMessages,
+          message_types: formData.message_types,  // NEW
+          target_segments: formData.target_segments,
+          ab_testing: formData.ab_testing,
+          messages: filteredMessages,  // NEW structure
           execution_id: executionId,
           submitted_at: new Date().toISOString()
         };
@@ -441,31 +423,6 @@
           </div>
 
           <form onSubmit={handleSubmit} className="form-body">
-            {/* Message Channels */}
-            <div className="section">
-              <div className="section-title">
-                Channels <span className="required">*</span>
-              </div>
-              <div className="checkbox-grid">
-                <label className="checkbox-item">
-                  <input
-                    type="checkbox"
-                    checked={formData.message_channels.includes('email')}
-                    onChange={() => handleCheckbox('message_channels', 'email')}
-                  />
-                  <span className="checkbox-label">Email</span>
-                </label>
-                <label className="checkbox-item">
-                  <input
-                    type="checkbox"
-                    checked={formData.message_channels.includes('linkedin')}
-                    onChange={() => handleCheckbox('message_channels', 'linkedin')}
-                  />
-                  <span className="checkbox-label">LinkedIn</span>
-                </label>
-              </div>
-            </div>
-
             {/* Target Segments */}
             <div className="section">
               <div className="section-title">
@@ -478,6 +435,25 @@
                       type="checkbox"
                       checked={formData.target_segments.includes(value)}
                       onChange={() => handleCheckbox('target_segments', value)}
+                    />
+                    <span className="checkbox-label">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* NEW: Unified Message Types (no Channels section) */}
+            <div className="section">
+              <div className="section-title">
+                Message Types <span className="required">*</span>
+              </div>
+              <div className="checkbox-grid">
+                {Object.entries(MESSAGE_TYPES).map(([value, label]) => (
+                  <label key={value} className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={formData.message_types.includes(value)}
+                      onChange={() => handleCheckbox('message_types', value)}
                     />
                     <span className="checkbox-label">{label}</span>
                   </label>
@@ -500,130 +476,50 @@
               </select>
             </div>
 
-            {/* LinkedIn Message Types */}
-            {formData.message_channels.includes('linkedin') && (
-              <div className="section">
-                <div className="section-title">LinkedIn Message Types</div>
-                <div className="checkbox-grid">
-                  {Object.entries(LINKEDIN_TYPES).map(([value, label]) => (
-                    <label key={value} className="checkbox-item">
-                      <input
-                        type="checkbox"
-                        checked={formData.linkedin_types.includes(value)}
-                        onChange={() => handleCheckbox('linkedin_types', value)}
+            {/* NEW: Message fields (no channel separation) */}
+            {formData.message_types.map(type => 
+              formData.target_segments.map(segment => (
+                <React.Fragment key={`${type}-${segment}`}>
+                  {shouldShowField(type, segment, 'A') && (
+                    <div className="message-card">
+                      <div className="message-header">
+                        <div className="message-title">
+                          {MESSAGE_TYPES[type]} · {SEGMENTS[segment]}
+                        </div>
+                        <div className="variant-badge">Variant A</div>
+                      </div>
+                      <textarea
+                        className="textarea-field"
+                        value={formData.messages?.[type]?.[segment]?.A || ''}
+                        onChange={(e) => handleMessageChange(type, segment, 'A', e.target.value)}
+                        placeholder={`Enter ${MESSAGE_TYPES[type]} campaign copy for ${SEGMENTS[segment]}...\n\nExample: "I noticed your work in ${SEGMENTS[segment]}. Let's schedule a meeting to discuss..."`}
                       />
-                      <span className="checkbox-label">{label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Email Message Types */}
-            {formData.message_channels.includes('email') && (
-              <div className="section">
-                <div className="section-title">Email Message Types</div>
-                <div className="checkbox-grid">
-                  {Object.entries(EMAIL_TYPES).map(([value, label]) => (
-                    <label key={value} className="checkbox-item">
-                      <input
-                        type="checkbox"
-                        checked={formData.email_types.includes(value)}
-                        onChange={() => handleCheckbox('email_types', value)}
+                    </div>
+                  )}
+                  {shouldShowField(type, segment, 'B') && (
+                    <div className="message-card">
+                      <div className="message-header">
+                        <div className="message-title">
+                          {MESSAGE_TYPES[type]} · {SEGMENTS[segment]}
+                        </div>
+                        <div className="variant-badge variant-b">Variant B</div>
+                      </div>
+                      <textarea
+                        className="textarea-field"
+                        value={formData.messages?.[type]?.[segment]?.B || ''}
+                        onChange={(e) => handleMessageChange(type, segment, 'B', e.target.value)}
+                        placeholder={`Enter ${MESSAGE_TYPES[type]} campaign copy variant B for ${SEGMENTS[segment]}...\n\nExample: "Given your expertise in ${SEGMENTS[segment]}, I'd love to connect..."`}
                       />
-                      <span className="checkbox-label">{label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+                    </div>
+                  )}
+                </React.Fragment>
+              ))
             )}
-
-            {/* LinkedIn Messages */}
-            {formData.message_channels.includes('linkedin') && 
-             formData.linkedin_types.map(type => 
-               formData.target_segments.map(segment => (
-                 <React.Fragment key={`linkedin-${type}-${segment}`}>
-                   {shouldShowField('linkedin', type, segment, 'A') && (
-                     <div className="message-card">
-                       <div className="message-header">
-                         <div className="message-title">
-                           LinkedIn · {LINKEDIN_TYPES[type]} · {SEGMENTS[segment]}
-                         </div>
-                         <div className="variant-badge">Variant A</div>
-                       </div>
-                       <textarea
-                         className="textarea-field"
-                         value={formData.messages.linkedin?.[type]?.[segment]?.A || ''}
-                         onChange={(e) => handleMessageChange('linkedin', type, segment, 'A', e.target.value)}
-                         placeholder="Enter message variant A..."
-                       />
-                     </div>
-                   )}
-                   {shouldShowField('linkedin', type, segment, 'B') && (
-                     <div className="message-card">
-                       <div className="message-header">
-                         <div className="message-title">
-                           LinkedIn · {LINKEDIN_TYPES[type]} · {SEGMENTS[segment]}
-                         </div>
-                         <div className="variant-badge variant-b">Variant B</div>
-                       </div>
-                       <textarea
-                         className="textarea-field"
-                         value={formData.messages.linkedin?.[type]?.[segment]?.B || ''}
-                         onChange={(e) => handleMessageChange('linkedin', type, segment, 'B', e.target.value)}
-                         placeholder="Enter message variant B..."
-                       />
-                     </div>
-                   )}
-                 </React.Fragment>
-               ))
-             )}
-
-            {/* Email Messages */}
-            {formData.message_channels.includes('email') && 
-             formData.email_types.map(type => 
-               formData.target_segments.map(segment => (
-                 <React.Fragment key={`email-${type}-${segment}`}>
-                   {shouldShowField('email', type, segment, 'A') && (
-                     <div className="message-card">
-                       <div className="message-header">
-                         <div className="message-title">
-                           Email · {EMAIL_TYPES[type]} · {SEGMENTS[segment]}
-                         </div>
-                         <div className="variant-badge">Variant A</div>
-                       </div>
-                       <textarea
-                         className="textarea-field"
-                         value={formData.messages.email?.[type]?.[segment]?.A || ''}
-                         onChange={(e) => handleMessageChange('email', type, segment, 'A', e.target.value)}
-                         placeholder="Enter message variant A..."
-                       />
-                     </div>
-                   )}
-                   {shouldShowField('email', type, segment, 'B') && (
-                     <div className="message-card">
-                       <div className="message-header">
-                         <div className="message-title">
-                           Email · {EMAIL_TYPES[type]} · {SEGMENTS[segment]}
-                         </div>
-                         <div className="variant-badge variant-b">Variant B</div>
-                       </div>
-                       <textarea
-                         className="textarea-field"
-                         value={formData.messages.email?.[type]?.[segment]?.B || ''}
-                         onChange={(e) => handleMessageChange('email', type, segment, 'B', e.target.value)}
-                         placeholder="Enter message variant B..."
-                       />
-                     </div>
-                   )}
-                 </React.Fragment>
-               ))
-             )}
 
             <button 
               type="submit" 
               className="submit-btn"
-              disabled={submitting || formData.message_channels.length === 0 || formData.target_segments.length === 0}
+              disabled={submitting || formData.message_types.length === 0 || formData.target_segments.length === 0}
             >
               {submitting ? 'Submitting...' : 'Submit & Continue Workflow'}
             </button>
