@@ -253,40 +253,50 @@
       'book_meeting_online': 'Book Meeting Online',
       'book_meeting_offline': 'Book Meeting Offline',
       'book_demo_online': 'Book Demo Online',
-      'introduce_us': 'Introduce Us',
       'light_pitch': 'Light Pitch',
       'post_accept_followup': 'Post-Accept Followup',
       'connection_request': 'Connection Request',
-      'bump_message': 'Bump Message'
+      'bump_message': 'Bump Message',
+      'introduce_us': 'Introduce Us'
     };
 
+    // UPDATED: Added new segments
     const SEGMENTS = {
-      'general': 'General',
-      'financial_services': 'Financial Services',
-      'healthcare': 'Healthcare',
-      'big_law': 'Big Law',
-      'management_consulting_firms': 'Management Consulting',
-      'technology_platform_companies': 'Technology & Platform'
+      'General': 'General',
+      'Healthcare': 'Healthcare',
+      'Financial Services': 'Financial Services',
+      'Management Consulting': 'Management Consulting',
+      'Big Law': 'Big Law',
+      'Technology & Platform': 'Technology & Platform',
+      'Investor': 'Investor',
+      'Operators / Founders': 'Operators / Founders',
+      'Roll-up strategists': 'Roll-up strategists',
+      'Tech builders': 'Tech builders'
+    };
+
+    // NEW: Outreach types
+    const OUTREACH_TYPES = {
+      'email': 'Email',
+      'linkedin': 'LinkedIn'
     };
 
     function ABMCampaignForm() {
-      // NEW: Simplified state (no message_channels, linkedin_types, email_types)
+      const [submitting, setSubmitting] = useState(false);
+      const [submitted, setSubmitted] = useState(false);
       const [formData, setFormData] = useState({
-        message_types: [],      // NEW: unified message types
+        outreach_type: [],  // NEW FIELD
         target_segments: [],
+        message_types: [],
         ab_testing: 'disabled',
         messages: {}
       });
-
-      const [submitting, setSubmitting] = useState(false);
-      const [submitted, setSubmitted] = useState(false);
 
       // Get webhook URL and execution ID from URL parameters
       const urlParams = new URLSearchParams(window.location.search);
       const webhookUrl = 'https://abm-form-cors-proxy.ops-ffa.workers.dev';
       const executionId = urlParams.get('execution_id');
 
-      // NEW: Initialize messages with message_type structure (not linkedin/email)
+      // Initialize messages with message_type structure
       useEffect(() => {
         const messages = {};
         
@@ -309,7 +319,6 @@
         }));
       };
 
-      // NEW: Simplified handleMessageChange (no channel parameter)
       const handleMessageChange = (type, segment, variant, value) => {
         setFormData(prev => ({
           ...prev,
@@ -326,7 +335,6 @@
         }));
       };
 
-      // NEW: Simplified shouldShowField (no channel parameter)
       const shouldShowField = (type, segment, variant) => {
         if (!formData.message_types.includes(type)) return false;
         if (!formData.target_segments.includes(segment)) return false;
@@ -354,12 +362,13 @@
           });
         });
 
-        // NEW: Payload structure (message_types instead of message_channels)
+        // Payload structure with outreach_type
         const payload = {
-          message_types: formData.message_types,  // NEW
+          outreach_type: formData.outreach_type,  // NEW FIELD
+          message_types: formData.message_types,
           target_segments: formData.target_segments,
           ab_testing: formData.ab_testing,
-          messages: filteredMessages,  // NEW structure
+          messages: filteredMessages,
           execution_id: executionId,
           submitted_at: new Date().toISOString()
         };
@@ -423,6 +432,25 @@
           </div>
 
           <form onSubmit={handleSubmit} className="form-body">
+            {/* NEW: Outreach Type */}
+            <div className="section">
+              <div className="section-title">
+                Outreach Type <span className="required">*</span>
+              </div>
+              <div className="checkbox-grid">
+                {Object.entries(OUTREACH_TYPES).map(([value, label]) => (
+                  <label key={value} className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={formData.outreach_type.includes(value)}
+                      onChange={() => handleCheckbox('outreach_type', value)}
+                    />
+                    <span className="checkbox-label">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             {/* Target Segments */}
             <div className="section">
               <div className="section-title">
@@ -442,7 +470,7 @@
               </div>
             </div>
 
-            {/* NEW: Unified Message Types (no Channels section) */}
+            {/* Unified Message Types */}
             <div className="section">
               <div className="section-title">
                 Message Types <span className="required">*</span>
@@ -476,7 +504,7 @@
               </select>
             </div>
 
-            {/* NEW: Message fields (no channel separation) */}
+            {/* Message fields */}
             {formData.message_types.map(type => 
               formData.target_segments.map(segment => (
                 <React.Fragment key={`${type}-${segment}`}>
@@ -519,7 +547,7 @@
             <button 
               type="submit" 
               className="submit-btn"
-              disabled={submitting || formData.message_types.length === 0 || formData.target_segments.length === 0}
+              disabled={submitting || formData.outreach_type.length === 0 || formData.message_types.length === 0 || formData.target_segments.length === 0}
             >
               {submitting ? 'Submitting...' : 'Submit & Continue Workflow'}
             </button>
